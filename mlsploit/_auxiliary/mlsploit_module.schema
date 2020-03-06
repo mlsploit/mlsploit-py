@@ -1,0 +1,31 @@
+# Base Schema
+display_name: str(required=True)
+tagline     : str(required=True, max=50)
+doctxt      : str(required=True)
+functions   : list(include('function'), min=1, required=True)
+icon_url    : str(required=False)
+
+---
+# Sub-component definitions
+
+function:
+  name                : str(required=True)
+  doctxt              : str(required=True)
+  options             : list(include('option'), required=True)
+  creates_new_files   : bool(required=True)
+  modifies_input_files: bool(required=True)
+  expected_filetype   : str(required=True)
+  optional_filetypes  : list(str(), required=False)
+  output_tags         : list(include('tag'), required=False)
+
+option:
+  name       : str(required=True)
+  type       : enum('str', 'int', 'float', 'bool', 'enum', required=True)
+  doctxt     : str(required=True)
+  required   : bool(required=True)
+  enum_values: list(str(), required=False)
+  default    : any(str(), num(), bool(), required=False)
+
+tag:
+  name: str(required=True)
+  type: enum('str', 'int', 'float', required=True)
