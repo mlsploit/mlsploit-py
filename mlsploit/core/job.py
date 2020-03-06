@@ -142,7 +142,7 @@ class OutputFileItem(FauxImmutableModel):
                 raise RuntimeError(f'invalid tag for '
                                    f'output file {self.name}: {name}')
 
-            elif type(value).__name__ != allowed_tags[name]:
+            if type(value).__name__ != allowed_tags[name]:
                 raise ValueError(f'output tag {name} should be '
                                  f' {allowed_tags[name]}, '
                                  f'found {type(value).__name__} '

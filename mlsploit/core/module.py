@@ -13,11 +13,13 @@ __all__ = ['Function', 'Module']
 
 
 class Tag(FauxImmutableModel):
+    # pylint: disable=too-few-public-methods
     name: str
     type: Literal['str', 'int', 'float']
 
 
 class Option(FauxImmutableModel):
+    # pylint: disable=too-few-public-methods
     name: str
     type: Literal['str', 'int', 'float', 'bool', 'enum']
     doctxt: str
@@ -76,11 +78,10 @@ class Function(FauxImmutableModel):
     optional_filetypes: Optional[List[str]]
     output_tags: Optional[List[Tag]]
 
-    # pylint: disable=no-self-argument,no-self-use
     @validator('options', 'output_tags', pre=True, always=True)
     def _init_list_if_not_supplied(cls, v):
+        # pylint: disable=no-self-argument,no-self-use
         return v or list()
-    # pylint: enable=no-self-argument,no-self-use
 
     def add_option(self,
                    name: str,
@@ -90,6 +91,7 @@ class Function(FauxImmutableModel):
                    enum_values: Optional[List[Any]] = None,
                    default: Optional[Any] = None
                    ) -> Option:
+        # pylint: disable=redefined-builtin,too-many-arguments
 
         if name in {o.name for o in self.options}:
             raise RuntimeError(f'option {name} already exists '
@@ -115,6 +117,7 @@ class Function(FauxImmutableModel):
         return filtered.pop()
 
     def add_output_tag(self, name: str, type: str):
+        # pylint: disable=redefined-builtin
         t = Tag(name=name, type=type)
         self.output_tags.append(t)
 
@@ -126,11 +129,10 @@ class Module(FauxImmutableModel):
     functions: List[Function] = list()
     icon_url: Optional[HttpUrl]
 
-    # pylint: disable=no-self-argument,no-self-use
     @validator('functions', pre=True, always=True)
     def _init_list_if_not_supplied(cls, v):
+        # pylint: disable=no-self-argument,no-self-use
         return v or list()
-    # pylint: enable=no-self-argument,no-self-use
 
     def add_function(self,
                      name: str,
@@ -140,6 +142,7 @@ class Module(FauxImmutableModel):
                      expected_filetype: str,
                      optional_filetypes: Optional[List[str]] = None
                      ) -> Function:
+        # pylint: disable=too-many-arguments
 
         if name in {f.name for f in self.functions}:
             raise RuntimeError(f'function {name} already exists')
