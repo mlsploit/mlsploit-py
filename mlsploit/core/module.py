@@ -78,10 +78,20 @@ class Function(FauxImmutableModel):
     optional_filetypes: Optional[List[str]]
     output_tags: Optional[List[Tag]]
 
+    # pylint: disable=no-self-argument,no-self-use
     @validator('options', 'output_tags', pre=True, always=True)
     def _init_list_if_not_supplied(cls, v):
-        # pylint: disable=no-self-argument,no-self-use
         return v or list()
+
+    @validator('expected_filetype')
+    def _convert_to_lower_and_strip(cls, v):
+        return v.lower().strip(' .')
+
+    @validator('optional_filetypes')
+    def _map_to_lower_and_strip(cls, v):
+        return list(v.map(lambda x: x.lower().strip(' .'), v)) \
+            if v is not None else None
+    # pylint: enable=no-self-argument,no-self-use
 
     def add_option(self,
                    name: str,
@@ -129,10 +139,21 @@ class Module(FauxImmutableModel):
     functions: List[Function] = list()
     icon_url: Optional[HttpUrl]
 
+    # pylint: disable=no-self-argument,no-self-use
     @validator('functions', pre=True, always=True)
     def _init_list_if_not_supplied(cls, v):
-        # pylint: disable=no-self-argument,no-self-use
         return v or list()
+
+    @validator('icon_url')
+    def _check_valid_image(cls, v):
+        if v is not None:
+            allowed_filetypes = ['.jpg', '.jpeg', '.png', '.svg']
+            is_valid = any(v.endswith(ft) for ft in allowed_filetypes)
+            if not is_valid:
+                raise ValueError(f'{v} is not a valid image URL, '
+                                 f'allowed file types: {allowed_filetypes}')
+        return v
+    # pylint: enable=no-self-argument,no-self-use
 
     def add_function(self,
                      name: str,
