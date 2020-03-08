@@ -13,4 +13,7 @@ install:
 # command to run tests
 script:
   - pylint mlsploit
-  - pytest
+  - coverage run -m pytest
+
+after_success:
+  - codecov # submit coverage
