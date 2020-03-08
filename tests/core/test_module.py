@@ -1,5 +1,4 @@
-from pathlib import Path
-
+from devtools import debug
 from pydantic.error_wrappers import ValidationError
 import pytest
 
@@ -7,62 +6,8 @@ from mlsploit import Module
 from mlsploit.core.module import Function
 from mlsploit.paths import ModulePaths
 
+from .constants import *
 
-MODULE_DISPLAY_NAME = 'Test Module'
-MODULE_TAGLINE = 'This is a test module!'
-MODULE_DOCTXT = """Long documentation for this module will go here..."""
-MODULE_ICON_URL = 'https://somedomain.org/icon.{extension}'
-
-FUNCTION_NAME = 'Test Function'
-FUNCTION_DOCTXT = """Some long ducumentation of Test Function..."""
-FUNCTION_EXPECTED_FILETYPE = 'TXT'
-FUNCTION_OPTIONAL_FILETYPES = ['rtf', '.ANS']
-
-OPTION_NAME = 'option1'
-OPTION_TYPE = 'str'
-OPTION_DOCTXT = """Some long ducumentation of option1..."""
-
-TAG_NAME = 'tag1'
-TAG_TYPE = 'int'
-
-
-##### Fixtures #####
-
-@pytest.fixture()
-def tmp_module_dir(tmp_path) -> Path:
-    module_dir = tmp_path/'testmodule'
-    module_dir.mkdir()
-    ModulePaths.set_module_dir(module_dir)
-    yield module_dir
-    ModulePaths.reset_module_dir()
-
-
-@pytest.fixture()
-def degenerate_module() -> Module:
-    return Module.build(
-        display_name=MODULE_DISPLAY_NAME,
-        tagline=MODULE_TAGLINE, doctxt=MODULE_DOCTXT,
-        icon_url=MODULE_ICON_URL.format(extension='jpg'))
-
-
-@pytest.fixture()
-def dummy_module(degenerate_module) -> Module:
-    m = degenerate_module
-    f = m.add_function(
-        name=FUNCTION_NAME,
-        doctxt=FUNCTION_DOCTXT,
-        creates_new_files=True,
-        modifies_input_files=False,
-        expected_filetype=FUNCTION_EXPECTED_FILETYPE)
-    f.add_option(name=OPTION_NAME,
-                 type=OPTION_TYPE,
-                 doctxt=OPTION_DOCTXT,
-                 required=True)
-    f.add_output_tag(name=TAG_NAME, type=TAG_TYPE)
-    return degenerate_module
-
-
-##### Tests #####
 
 # TODO: add tests for validation logic
 
@@ -119,6 +64,7 @@ def test_degenerate_module_is_invalid(degenerate_module):
 
 
 def test_degenerate_module_cannot_be_saved(degenerate_module, tmp_module_dir):
+    debug(tmp_module_dir)
     with pytest.raises(ValueError) as excinfo:
         degenerate_module.save()
     assert 'functions: Length of [] is less than than 1' in str(excinfo.value)
@@ -157,7 +103,7 @@ def test_module_add_duplicate_function(dummy_module):
     m = dummy_module
 
     with pytest.raises(RuntimeError) as excinfo:
-        f = m.add_function(
+        m.add_function(
             name=FUNCTION_NAME,
             doctxt=FUNCTION_DOCTXT,
             creates_new_files=True,
@@ -190,6 +136,7 @@ def test_module_save(dummy_module, tmp_module_dir):
 
 
 def test_module_load(dummy_module, tmp_module_dir):
+    debug(tmp_module_dir)
     dummy_module.save()
 
     m = Module.load()

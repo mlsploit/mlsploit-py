@@ -212,12 +212,12 @@ class OutputDocument:
 
             # check output file item exists
             if not output_file_path.exists():
-                raise RuntimeError(f'cannot find output file item'
+                raise RuntimeError(f'cannot find output file item '
                                    f'on disk: {output_file_name}')
 
             # check output file item is a valid file
             if not output_file_path.is_file():
-                raise RuntimeError(f'cannot parse output file item'
+                raise RuntimeError(f'cannot parse output file item '
                                    f'as a valid file: {output_file_name}')
 
     def save(self, path: Optional[FilepathType] = None):
@@ -310,3 +310,11 @@ class Job(metaclass=JobMeta):
 
         cls._output_document.save()
         cls._committed = True
+
+    @classmethod
+    def reset(cls):
+        cls._input_document = None
+        cls._output_document = None
+
+        cls._initialized = False
+        cls._committed = False
