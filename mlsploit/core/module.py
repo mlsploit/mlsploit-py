@@ -182,7 +182,7 @@ class Module(FauxImmutableModel):
                     if f.name == function_name]
 
         if len(filtered) == 0:
-            raise ValueError(f'cannot find function "{function_name}"')
+            raise RuntimeError(f'cannot find function "{function_name}"')
 
         return filtered.pop()
 
@@ -196,10 +196,13 @@ class Module(FauxImmutableModel):
         self.validate_with_schema()
 
         path = path or ModulePaths().module_file
+
+        data = self.dict()
+        data['icon_url'] = str(data['icon_url'])
+
         with open(path, 'w') as f:
             f.write(yaml.dump(
-                self.dict(),
-                sort_keys=False,
+                data, sort_keys=False,
                 default_flow_style=False))
 
     @classmethod
