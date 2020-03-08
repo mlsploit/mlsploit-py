@@ -89,7 +89,7 @@ class Function(FauxImmutableModel):
 
     @validator('optional_filetypes')
     def _map_to_lower_and_strip(cls, v):
-        return list(v.map(lambda x: x.lower().strip(' .'), v)) \
+        return list(map(lambda x: x.lower().strip(' .'), v)) \
             if v is not None else None
     # pylint: enable=no-self-argument,no-self-use
 

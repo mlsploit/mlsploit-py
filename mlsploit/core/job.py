@@ -48,10 +48,12 @@ class InputDocument(FauxImmutableModel):
     tags: List[Mapping[str, Any]]
 
     @property
+    def module(self) -> Module:
+        return Module.load()
+
+    @property
     def function(self) -> Function:
-        module = Module().load()
-        function = module.get_function(self.name)
-        return function
+        return self.module.get_function(self.name)
 
     @property
     def input_file_items(self) -> List[InputFileItem]:
