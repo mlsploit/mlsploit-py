@@ -94,6 +94,10 @@ class InputDocument(FauxImmutableModel):
 
         # check files
         for input_file_item in self.input_file_items:
+            if not input_file_item.path.exists():
+                raise RuntimeError(f'cannot find input file item '
+                                   f'on disk: {input_file_item.path}')
+
             input_file_item.validate_with_function(function)
 
     @classmethod

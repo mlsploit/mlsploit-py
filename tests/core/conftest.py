@@ -56,10 +56,13 @@ def dummy_module(degenerate_module) -> Module:
 
 
 @pytest.fixture
-def dummy_input_document_dict() -> dict:
+def dummy_input_document_dict(tmp_job_dir) -> dict:
+    input_file_name = 'test.txt'
+    with open(JobPaths().input_dir/input_file_name, 'w'):
+        pass
     return {'name': FUNCTION_NAME,
             'num_files': 1,
-            'files': ['test.txt'],
+            'files': [input_file_name],
             'options': {OPTION_NAME: 'dummy_option_value'},
             'tags': [{TAG_NAME: 123}]}
 
