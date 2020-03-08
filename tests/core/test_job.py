@@ -56,6 +56,8 @@ def test_job_initialize(dummy_module, dummy_input_document_dict,
         assert input_file_item.name == input_file_name
         assert input_file_item.tags == input_file_tags
 
+    Job.reset()
+
 
 def test_job_reserve_output_file_item(initialized_job):
     output_file_name = 'output_file.txt'
