@@ -15,7 +15,8 @@ $ pip install git+https://github.com/mlsploit/mlsploit-py
 This will fetch the package from this repository and install it locally. We're also working on releasing a [PyPI](https://pypi.org/) distribution soon.
 
 ## Usage
-This package support automatic loading of MLsploit jobs inside your module.
+This package supports automatic loading of MLsploit jobs inside your module.
+
 ```python
 # your_mlsploit_module.py
 
@@ -29,7 +30,7 @@ input_file_items = Job.input_file_items # you can load input_file_items[i].path
 options = Job.options # can access options.option1, option.option2 for function_name
 
 # ...
-# do stuff based on the information above
+# do stuff based on the information above ...
 # ...
 
 # when you're done, you can reserve output files
@@ -44,6 +45,46 @@ with open(output_file_item.path, 'w') as f:
 # as defined in your module schema
 output_file_item.add_tag(name='tagname', value='tagvalue')
 
-# you can add as many output files in the above manner as you wish
+# you can add several output files in the above manner
+
 # when you're done done, don't forget to commit the output!
-Job.commit_output() # this package will take care of the rest
+Job.commit_output() # mlsploit-py will take care of the rest
+```
+
+
+You can also use this package to create your MLsploit module configuration file `mlsploit_module.yaml`
+instead of having to edit it manually. For more information on the configuration file schema, 
+[see here](https://github.com/mlsploit/mlsploit-py/blob/master/mlsploit/_auxiliary/mlsploit_module.schema).
+
+```python 
+# make_dummy_module.py
+
+from mlsploit import Module
+
+module = Module.build(
+    display_name='Dummy Module',
+    tagline='This is a dummy module!', 
+    doctxt="""Long documentation for this module will go here...""",
+    icon_url='https://somedomain.org/icon.jpg')
+
+function = module.add_function(
+    name='Test Function',
+    doctxt="""Some long ducumentation of Test Function...""",
+    creates_new_files=True,
+    modifies_input_files=False,
+    expected_filetype='txt',
+    optional_filetypes=['rtf', 'ans'])
+function.add_option(
+    name='option1',
+    type='str',
+    doctxt="""Some long ducumentation of option1...""",
+    required=True)
+function.add_output_tag(name='tag1', type='str')
+function.add_output_tag(name='tag2', type='int')
+
+# you can add several functions and function options in the above manner
+
+# once you're done, the following command will save the mlsploit_module.yaml
+# in the same directory as this file
+module.save()
+```
