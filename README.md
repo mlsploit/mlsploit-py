@@ -53,8 +53,9 @@ Job.commit_output() # mlsploit-py will take care of the rest
 ```
 
 
-You can also use this package to create your MLsploit module configuration file `mlsploit_module.yaml`
-instead of having to edit it manually. For more information on the configuration file schema, 
+You can also use this package to programmatically create your MLsploit module configuration file (`mlsploit_module.yaml`)
+instead of editing it manually. This will also validate your MLsploit module for errors. 
+For more information on the configuration file schema, 
 [see here](https://github.com/mlsploit/mlsploit-py/blob/master/mlsploit/_auxiliary/mlsploit_module.schema).
 
 ```python 
