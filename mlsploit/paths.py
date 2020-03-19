@@ -1,13 +1,15 @@
 # pylint: disable=too-few-public-methods
 
+from os import PathLike
+
 from pathlib import Path, PurePosixPath
-from typing import Type, Union
+from typing import Union
 
 
 __all__ = ['FilepathType', 'JobPaths', 'LibraryPaths', 'ModulePaths']
 
 
-FilepathType = Union[str, Path, Type[Path]]
+FilepathType = Union[str, PathLike]
 
 
 class LibraryPaths:
