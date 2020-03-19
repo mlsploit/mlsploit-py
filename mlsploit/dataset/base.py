@@ -1,0 +1,253 @@
+from collections import namedtuple
+from pathlib import Path
+from threading import Lock
+from typing import Any, Generator, Mapping, \
+    Optional, Sequence, Tuple, Type, Union
+import warnings
+
+from numcodecs import JSON, Pickle
+import numpy as np
+from pydantic import BaseModel, Field, validator
+import zarr
+
+from ..paths import FilepathType
+
+
+__all__ = ['Dataset']
+
+
+_ATTRS_KEY = '__ATTRS__'
+_METADATA_KEY = '__METADATA__'
+_RECOMMENDED_FILENAME = 'MLSPLOIT.db'
+
+PrimitiveType = Union[str, int, float, bool]
+MetadataType = Tuple[Any, ...]
+ItemType = Tuple[Any, ...]
+
+
+class _MetaDataset(type):
+    @property
+    def recommended_filename(cls):
+        return _RECOMMENDED_FILENAME
+
+
+class Dataset(metaclass=_MetaDataset):
+    class ItemAttr(BaseModel):
+        name: str
+        shape: Optional[Tuple[int, ...]] = Field(...)
+        dtype: Type
+
+        class Config:
+            # pylint: disable=too-few-public-methods
+            allow_mutation = False
+
+        @validator('name')
+        def _ensure_name_is_not_reserved(cls, v):
+            # pylint: disable=no-self-argument,no-self-use
+            if v in {_ATTRS_KEY, _METADATA_KEY}:
+                raise ValueError('Item attribute name cannot be %s' % v)
+            return v
+
+        @validator('name')
+        def _ensure_name_is_identifier(cls, v):
+            # pylint: disable=no-self-argument,no-self-use
+            if not v.isidentifier():
+                raise ValueError('Item attribute name has to be '
+                                 'a valid python identifier (got: %s)' % v)
+            return v
+
+    def __init__(self, filepath: FilepathType,
+                 item_attrs: Sequence[ItemAttr],
+                 metadata: Optional[Mapping[str, PrimitiveType]] = None):
+
+        if isinstance(item_attrs, self.ItemAttr):
+            item_attrs = [item_attrs]
+
+        metadata = metadata or dict()
+        self._validate_metadata_dict(metadata)
+
+        self._path = Path(filepath).resolve()
+        self._item_attrs = tuple(item_attrs)
+        self._metadata = metadata
+        self._lock = Lock()
+
+        if not self._path.exists():
+            self._setup_dataset()
+        self._validate_dataset()
+
+    def __repr__(self) -> str:
+        return '%s(\'%s\', item_attrs=%s, metadata=%s, num_items=%d)' % (
+            self.__class__.__name__, self.path,
+            self.item_attrs, self.metadata, len(self))
+
+    def __len__(self) -> int:
+        sizes = set()
+        with self._lock, zarr.ZipStore(self._path, mode='r') as store:
+            root = zarr.group(store=store)
+            for item_attr in self._item_attrs:
+                sizes.add(len(root[item_attr.name]))
+        if len(sizes) != 1:
+            raise RuntimeError('Dataset corrupted!!!')
+        return sizes.pop()
+
+    def __getitem__(self, idx) -> ItemType:
+        item_dict = dict()
+        with self._lock, zarr.ZipStore(self._path, mode='r') as store:
+            root = zarr.group(store=store)
+            for item_attr in self._item_attrs:
+                attr_name = item_attr.name
+                item_dict[attr_name] = root[attr_name][idx]
+
+        return namedtuple(
+            'Item', [it.name for it in self._item_attrs])(**item_dict)
+
+    def __iter__(self) -> Generator[ItemType, None, None]:
+        for i in range(len(self)):
+            yield self[i]
+
+    def _setup_dataset(self):
+        item_attr_names = set()
+        for item_attr in self._item_attrs:
+            if item_attr.name in item_attr_names:
+                raise RuntimeError(
+                    'Found duplicate item attribute name: %s' % item_attr.name)
+            item_attr_names.add(item_attr.name)
+
+        with self._lock, zarr.ZipStore(self._path, mode='w') as store:
+            root = zarr.group(store=store)
+
+            attrs = root.empty(
+                _ATTRS_KEY, shape=len(self._item_attrs),
+                chunks=1, dtype=object, object_codec=Pickle())
+            for i, item_attr in enumerate(self._item_attrs):
+                attrs[i] = item_attr
+
+            metadata = root.empty(
+                _METADATA_KEY, shape=1,
+                dtype=object, object_codec=JSON())
+            metadata[0] = self._metadata
+
+            for item_attr in self._item_attrs:
+                attr_name = item_attr.name
+                attr_shape = item_attr.shape
+                attr_dtype = item_attr.dtype
+
+                collection_shape = (0,) + attr_shape \
+                    if attr_shape is not None else (0,)
+                chunk_shape = (1,) + attr_shape \
+                    if attr_shape is not None else (1,)
+
+                root.empty(
+                    attr_name, shape=collection_shape,
+                    chunks=chunk_shape, dtype=attr_dtype)
+
+    def _validate_dataset(self):
+        def dict_equal(dict1, dict2):
+            try:
+                assert set(dict1.keys()) == set(dict2.keys())
+                for key, val in dict1.items():
+                    assert dict2[key] == val
+            except AssertionError:
+                return False
+            else:
+                return True
+
+        with self._lock, zarr.ZipStore(self._path, mode='r') as store:
+            root = zarr.group(store=store)
+
+            item_attrs = tuple(root[_ATTRS_KEY])
+            if item_attrs != self._item_attrs:
+                raise RuntimeError('Failed to validate stored dataset, '
+                                   'item attributes don\'t match')
+
+            metadata = dict(root[_METADATA_KEY][0])
+            if not dict_equal(metadata, self._metadata):
+                raise RuntimeError('Failed to validate stored dataset, '
+                                   'metadata doesn\'t match')
+
+    @staticmethod
+    def _validate_metadata_dict(metadata):
+        for k, v in metadata.items():
+            if not k.isidentifier():
+                raise ValueError(f'Metadata key has to be '
+                                 f'a valid python identifier (got: {k})')
+            if not any(isinstance(v, t) for t in PrimitiveType.__args__):
+                raise ValueError(f'Metadata value needs to be '
+                                 f'one of {PrimitiveType.__args__} '
+                                 f'(got: {type(v)})')
+
+    @property
+    def path(self) -> FilepathType:
+        return self._path
+
+    @property
+    def metadata(self) -> MetadataType:
+        return namedtuple('Metadata', self._metadata.keys())(**self._metadata)
+
+    @property
+    def item_attrs(self) -> Tuple['Dataset.ItemAttr', ...]:
+        return tuple(self._item_attrs)
+
+    def add_item(self, **attr_kwargs):
+        initial_size = len(self)
+
+        item_dict = dict()
+        for item_attr in self._item_attrs:
+            attr_name = item_attr.name
+            attr_shape = item_attr.shape
+            attr_dtype = item_attr.dtype
+
+            try:
+                attr_val = attr_kwargs[attr_name]
+            except KeyError:
+                raise RuntimeError(f'Item attribute missing: {attr_name}')
+
+            if attr_shape is not None \
+                    and np.array(attr_val).shape != attr_shape:
+                raise ValueError(f'Shape mismatch for {attr_name} '
+                                 f'(expected: {attr_shape}, '
+                                 f'got: {np.array(attr_val).shape})')
+
+            attr_val = np.expand_dims(attr_val, axis=0) \
+                if isinstance(attr_val, np.ndarray) \
+                else np.array([attr_val], dtype=attr_dtype)
+            attr_val = attr_val.astype(attr_dtype)
+
+            item_dict[attr_name] = attr_val
+
+        with self._lock, warnings.catch_warnings():
+            warnings.simplefilter('ignore', UserWarning)
+
+            store = zarr.ZipStore(self._path, mode='a')
+            root = zarr.group(store=store)
+            for k, v in item_dict.items():
+                root[k].append(v)
+            store.close()
+
+        if len(self) != initial_size + 1:
+            raise RuntimeError(
+                'Dataset got corrupted while trying to add %s' % item_dict)
+
+    @staticmethod
+    def read_metadata(filepath: FilepathType) -> MetadataType:
+        filepath = Path(filepath).resolve()
+        with zarr.ZipStore(filepath, mode='r') as store:
+            root = zarr.group(store=store)
+            metadata = dict(root[_METADATA_KEY][0])
+        return namedtuple('Metadata', metadata.keys())(**metadata)
+
+    @staticmethod
+    def read_item_attrs(filepath: FilepathType) -> Tuple['Dataset.ItemAttr', ...]:
+        filepath = Path(filepath).resolve()
+        with zarr.ZipStore(filepath, mode='r') as store:
+            root = zarr.group(store=store)
+            item_attrs = tuple(root[_ATTRS_KEY][:])
+        return item_attrs
+
+    @classmethod
+    def load(cls, filepath: FilepathType) -> 'Dataset':
+        filepath = Path(filepath).resolve()
+        metadata = cls.read_metadata(filepath)
+        item_attrs = cls.read_item_attrs(filepath)
+        return cls(filepath, item_attrs,
+                   metadata=metadata._asdict())
