@@ -35,6 +35,21 @@ def make_random_valid_identifier():
 
 
 @pytest.fixture
+def make_random_invalid_identifier(make_random_valid_identifier):
+    def __make_random_valid_identifier():
+        invalid_chars = string.punctuation.replace('_', '')
+
+        identifier = make_random_valid_identifier()
+        identifier += ''.join([random.choice(invalid_chars)
+                               for _ in range(random.randint(1, 5))])
+        identifier = list(identifier)
+        random.shuffle(identifier)
+        return ''.join(identifier)
+
+    return __make_random_valid_identifier
+
+
+@pytest.fixture
 def make_random_item_attr(make_random_valid_identifier):
     def __make_random_item_attr():
         name = make_random_valid_identifier()
@@ -99,7 +114,7 @@ def random_item_attrs(make_random_item_attr):
 
 
 @pytest.fixture
-def random_metadata(make_random_valid_identifier):
+def random_metadata_dict(make_random_valid_identifier):
     keys = [make_random_valid_identifier()
             for _ in range(random.randint(1, 10))]
 
@@ -124,9 +139,9 @@ def random_metadata(make_random_valid_identifier):
 
 
 @pytest.fixture
-def random_empty_dataset(tmp_dataset_path, random_item_attrs, random_metadata):
+def random_empty_dataset(tmp_dataset_path, random_item_attrs, random_metadata_dict):
     return Dataset(tmp_dataset_path, random_item_attrs,
-                   metadata=random_metadata)
+                   metadata=random_metadata_dict)
 
 
 @pytest.fixture

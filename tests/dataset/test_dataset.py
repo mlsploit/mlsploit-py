@@ -51,16 +51,6 @@ def test_dataset_item_attr_reserved_name(attr_name):
             % attr_name) in str(excinfo)
 
 
-@pytest.mark.parametrize('attr_name', ['!qwerty', 'asd$gh', 'zxcv&', 'ab.c'])
-def test_dataset_item_attr_name_not_identifier(attr_name):
-    with pytest.raises(ValueError) as excinfo:
-        Dataset.ItemAttr(
-            name=attr_name,
-            shape=None,
-            dtype=int)
-    assert 'name has to be a valid python identifier' in str(excinfo)
-
-
 def test_dataset_init_with_item_attrs(tmp_dataset_path, random_item_attrs):
     assert not tmp_dataset_path.exists()
 
@@ -87,16 +77,29 @@ def test_dataset_init_with_one_item_attr(tmp_dataset_path, make_random_item_attr
     assert dataset.item_attrs[0] == item_attr
 
 
+def test_dataset_item_attr_name_not_identifier(
+        tmp_dataset_path, make_random_invalid_identifier):
+
+    for _ in range(100):
+        invalid_name = make_random_invalid_identifier()
+        with pytest.raises(ValueError) as excinfo:
+            Dataset(tmp_dataset_path,
+                    Dataset.ItemAttr(
+                        name=invalid_name,
+                        shape=None, dtype=int))
+        assert 'must be valid identifiers' in str(excinfo)
+
+
 def test_dataset_init_with_metadata(
-        tmp_dataset_path, random_metadata,
+        tmp_dataset_path, random_metadata_dict,
         random_item_attrs):
 
     dataset = Dataset(
         tmp_dataset_path,
         random_item_attrs,
-        metadata=random_metadata)
+        metadata=random_metadata_dict)
 
-    for k, v in random_metadata.items():
+    for k, v in random_metadata_dict.items():
         assert getattr(dataset.metadata, k) == v
 
 
