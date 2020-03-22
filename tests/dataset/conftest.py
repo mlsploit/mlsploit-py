@@ -1,5 +1,6 @@
 # pylint: disable=redefined-outer-name
 
+import keyword
 from pathlib import Path
 import random
 import string
@@ -29,7 +30,8 @@ def make_random_valid_identifier():
         identifier = random.choice(string.ascii_lowercase)
         identifier += ''.join([random.choice(valid_chars)
                                for _ in range(random.randint(1, 5))])
-        return identifier
+        return identifier if not keyword.iskeyword(identifier) \
+            else __make_random_valid_identifier()
 
     return __make_random_valid_identifier
 
