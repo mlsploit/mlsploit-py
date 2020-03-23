@@ -23,7 +23,7 @@ def test_dataset_item_attr_init():
         dtype=int)
     assert attr.name == 'vector'
     assert attr.shape == (123,)
-    assert attr.dtype is int
+    assert attr.dtype is np.dtype(int)
 
 
 def test_dataset_item_attr_immutable():
@@ -33,7 +33,7 @@ def test_dataset_item_attr_immutable():
         dtype=int)
     assert attr.name == 'tensor'
     assert attr.shape == (123, 456, 789)
-    assert attr.dtype is int
+    assert attr.dtype is np.dtype(int)
 
     with pytest.raises(TypeError) as excinfo:
         attr.dtype = str

@@ -41,11 +41,17 @@ class Dataset(metaclass=_DatasetMeta):
     class ItemAttr(BaseModel):
         name: str
         shape: Optional[Tuple[int, ...]] = Field(...)
-        dtype: Type
+        dtype: np.dtype
 
         class Config:
             # pylint: disable=too-few-public-methods
             allow_mutation = False
+            arbitrary_types_allowed = True
+
+        @validator('dtype', pre=True)
+        def _cast_to_np_dtype(cls, v):
+            # pylint: disable=no-self-argument,no-self-use
+            return np.dtype(v)
 
         @validator('name')
         def _ensure_name_is_not_reserved(cls, v):
@@ -125,7 +131,7 @@ class Dataset(metaclass=_DatasetMeta):
             for item_attr in self.item_attrs:
                 attr_name = item_attr.name
                 attr_shape = item_attr.shape
-                attr_dtype = item_attr.dtype
+                attr_dtype = item_attr.dtype.name
 
                 collection_shape = (0,) + attr_shape \
                     if attr_shape is not None else (0,)
@@ -157,7 +163,7 @@ class Dataset(metaclass=_DatasetMeta):
         for item_attr in self.item_attrs:
             attr_name = item_attr.name
             attr_shape = item_attr.shape
-            attr_dtype = item_attr.dtype
+            attr_dtype = item_attr.dtype.name
 
             try:
                 attr_val = attr_kwargs[attr_name]

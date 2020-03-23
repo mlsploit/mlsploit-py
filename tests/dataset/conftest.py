@@ -71,12 +71,14 @@ def make_random_item_attr(make_random_valid_identifier):
 @pytest.fixture
 def make_random_data():
     def __make_random_data(shape, dtype):
+        shape = (1,) + shape \
+            if type(shape) is tuple \
+            else (1,)
+
         data = np_random.random(shape)
         data = data * random.randint(1, 1000)
-        data = data.astype(dtype) \
-            if isinstance(data, np.ndarray) \
-            else dtype(data)
-        return data
+        data = data.astype(dtype)
+        return data[0]
 
     return __make_random_data
 
