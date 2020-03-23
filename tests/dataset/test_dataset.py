@@ -40,15 +40,17 @@ def test_dataset_item_attr_immutable():
     assert '"ItemAttr" is immutable' in str(excinfo)
 
 
-@pytest.mark.parametrize('attr_name', [ATTRS_KEY, METADATA_KEY])
-def test_dataset_item_attr_reserved_name(attr_name):
-    with pytest.raises(ValueError) as excinfo:
-        Dataset.ItemAttr(
-            name=attr_name,
-            shape=(123,),
-            dtype=int)
-    assert ('Item attribute name cannot be %s'
-            % attr_name) in str(excinfo)
+def test_dataset_item_attr_serialize_deserialize(random_item_attrs):
+    for item_attr in random_item_attrs:
+        item_attr_serialized = item_attr.serialize()
+
+        assert item_attr_serialized['shape'] is None \
+            or type(item_attr_serialized['shape']) is list
+        assert 'dtype' not in item_attr_serialized
+        assert 'dtype_name' in item_attr_serialized
+        assert type(item_attr_serialized['dtype_name']) is str
+
+        assert Dataset.ItemAttr.deserialize(item_attr_serialized) == item_attr
 
 
 def test_dataset_init_with_item_attrs(tmp_dataset_path, random_item_attrs):

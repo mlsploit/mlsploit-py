@@ -3,10 +3,9 @@ from functools import partial
 from pathlib import Path
 from threading import Lock
 from typing import Generator, Mapping, \
-    Optional, Sequence, Tuple, Type, Union
+    Optional, Sequence, Tuple, Union
 import warnings
 
-from numcodecs import JSON, Pickle
 import numpy as np
 from pydantic import BaseModel, Field, validator
 import zarr
@@ -17,8 +16,8 @@ from ..paths import FilepathType
 __all__ = ['Dataset']
 
 
-_ATTRS_KEY = '__ATTRS__'
 _METADATA_KEY = '__METADATA__'
+_ITEMATTRS_KEY = '__ITEMATTRS__'
 _RECOMMENDED_FILENAME = 'MLSPLOIT.db'
 
 PrimitiveType = Union[str, int, float, bool]
@@ -53,12 +52,19 @@ class Dataset(metaclass=_DatasetMeta):
             # pylint: disable=no-self-argument,no-self-use
             return np.dtype(v)
 
-        @validator('name')
-        def _ensure_name_is_not_reserved(cls, v):
-            # pylint: disable=no-self-argument,no-self-use
-            if v in {_ATTRS_KEY, _METADATA_KEY}:
-                raise ValueError('Item attribute name cannot be %s' % v)
-            return v
+        def serialize(self):
+            data = self.dict()
+            data['shape'] = list(data['shape']) \
+                if data['shape'] is not None else None
+            data['dtype_name'] = self.dtype.name
+            del data['dtype']
+            return data
+
+        @classmethod
+        def deserialize(cls, data):
+            return cls(name=data['name'],
+                       shape=data['shape'],
+                       dtype=data['dtype_name'])
 
     def __init__(self, filepath: FilepathType,
                  item_attrs: Sequence['Dataset.ItemAttr'],
@@ -83,7 +89,7 @@ class Dataset(metaclass=_DatasetMeta):
         self._validate_dataset()
 
     def __repr__(self) -> str:
-        return '%s(\'%s\', %s, %s, num_items=%d)' % (
+        return '<%s: \'%s\', %s, %s, len=%d>' % (
             self.__class__.__name__, self.path,
             self.metadata, self.item_attrs, len(self))
 
@@ -99,7 +105,6 @@ class Dataset(metaclass=_DatasetMeta):
 
     def __getitem__(self, idx) -> Union['ItemView', 'ItemSetView']:
         attr_names = list(map(lambda a: a.name, self.item_attrs))
-
         with self._lock, zarr.ZipStore(self.path, mode='r') as store:
             root = zarr.group(store=store)
             data_dict = {attr_name: root[attr_name][idx]
@@ -114,47 +119,59 @@ class Dataset(metaclass=_DatasetMeta):
             yield self[i]
 
     def _setup_dataset(self):
+        item_attrs_serialized = list(map(
+            lambda it: it.serialize(), self.item_attrs))
+
         with self._lock, zarr.ZipStore(self.path, mode='w') as store:
             root = zarr.group(store=store)
 
-            attrs = root.empty(
-                _ATTRS_KEY, shape=len(self.item_attrs),
-                chunks=1, dtype=object, object_codec=Pickle())
-            for i, item_attr in enumerate(self.item_attrs):
-                attrs[i] = item_attr
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore', UserWarning)
 
-            metadata = root.empty(
-                _METADATA_KEY, shape=1,
-                dtype=object, object_codec=JSON())
-            metadata[0] = self.metadata._asdict()
+                root.attrs[_ITEMATTRS_KEY] = item_attrs_serialized
+                root.attrs[_METADATA_KEY] = self.metadata._asdict()
 
-            for item_attr in self.item_attrs:
-                attr_name = item_attr.name
-                attr_shape = item_attr.shape
-                attr_dtype = item_attr.dtype.name
+            for item_attr_serialized in item_attrs_serialized:
+                attr_name = item_attr_serialized['name']
+                attr_dtype = item_attr_serialized['dtype_name']
+                attr_shape = tuple(item_attr_serialized['shape']) \
+                    if item_attr_serialized['shape'] is not None else None
 
                 collection_shape = (0,) + attr_shape \
                     if attr_shape is not None else (0,)
                 chunk_shape = (1,) + attr_shape \
                     if attr_shape is not None else (1,)
 
-                root.empty(
+                root.create_dataset(
                     attr_name, shape=collection_shape,
                     chunks=chunk_shape, dtype=attr_dtype)
 
     def _validate_dataset(self):
         with self._lock, zarr.ZipStore(self.path, mode='r') as store:
             root = zarr.group(store=store)
+            item_attrs_loaded = list(map(
+                self.ItemAttr.deserialize,
+                root.attrs[_ITEMATTRS_KEY]))
+            metadata_loaded = root.attrs[_METADATA_KEY]
 
-            item_attrs = tuple(root[_ATTRS_KEY])
-            if item_attrs != self.item_attrs:
-                raise RuntimeError('Failed to validate stored dataset, '
-                                   'item attributes don\'t match')
+        if len(self.item_attrs) != len(item_attrs_loaded):
+            raise RuntimeError(f'Length of supplied item attributes '
+                               f'({len(self.item_attrs)}) don\'t match '
+                               f'length of loaded item attributes '
+                               f'({len(item_attrs_loaded)})')
 
-            metadata = root[_METADATA_KEY][0]
-            if metadata == self.metadata:
-                raise RuntimeError('Failed to validate stored dataset, '
-                                   'metadata doesn\'t match')
+        for item_attr_supplied, item_attr_loaded in \
+                zip(self.item_attrs, item_attrs_loaded):
+
+            if item_attr_supplied != item_attr_loaded:
+                raise RuntimeError(f'Item attribute doesn\'t match '
+                                   f'(supplied: {item_attr_supplied} '
+                                   f'got: {item_attr_loaded})')
+
+        if len(self.metadata) > 0 \
+                and metadata_loaded != self.metadata._asdict():
+            raise RuntimeError('Failed to validate stored dataset, '
+                               'metadata doesn\'t match')
 
     def add_item(self, **attr_kwargs):
         initial_size = len(self)
@@ -201,15 +218,17 @@ class Dataset(metaclass=_DatasetMeta):
         filepath = Path(filepath).resolve()
         with zarr.ZipStore(filepath, mode='r') as store:
             root = zarr.group(store=store)
-            metadata = dict(root[_METADATA_KEY][0])
-        return MetadataViewMeta(metadata.keys())(**metadata)
+            metadata = root.attrs[_METADATA_KEY]
+        return MetadataViewMeta(sorted(metadata.keys()))(**metadata)
 
-    @staticmethod
-    def read_item_attrs(filepath: FilepathType) -> 'ItemAttrSetView':
+    @classmethod
+    def read_item_attrs(cls, filepath: FilepathType) -> 'ItemAttrSetView':
         filepath = Path(filepath).resolve()
         with zarr.ZipStore(filepath, mode='r') as store:
             root = zarr.group(store=store)
-            item_attrs = tuple(root[_ATTRS_KEY][:])
+            item_attrs_serialized = root.attrs[_ITEMATTRS_KEY]
+        item_attrs = list(map(
+            cls.ItemAttr.deserialize, item_attrs_serialized))
         return ItemAttrSetViewMeta(
             map(lambda a: a.name, item_attrs))(*item_attrs)
 
