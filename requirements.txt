@@ -1,5 +1,4 @@
 numpy>=1.18.2,<2
-numcodecs==0.6.4
 pydantic==1.4
 pyyaml==5.3.1
 typing-extensions==3.7.4.1

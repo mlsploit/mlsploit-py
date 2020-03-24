@@ -10,6 +10,7 @@ from numpy import random as np_random
 import pytest
 
 from mlsploit.dataset import Dataset
+from mlsploit.dataset.base import ItemAttr
 
 from .constants import *
 
@@ -60,7 +61,7 @@ def make_random_item_attr(make_random_valid_identifier):
                        for _ in range(random.randint(1, 4)))
         dtype = random.choice([str, int, float, bool, np.uint8, np.float32])
 
-        return Dataset.ItemAttr(
+        return ItemAttr(
             name=name,
             shape=shape,
             dtype=dtype)
@@ -72,7 +73,7 @@ def make_random_item_attr(make_random_valid_identifier):
 def make_random_data():
     def __make_random_data(shape, dtype):
         shape = (1,) + shape \
-            if type(shape) is tuple \
+            if isinstance(shape, tuple) \
             else (1,)
 
         data = np_random.random(shape)
@@ -143,13 +144,21 @@ def random_metadata_dict(make_random_valid_identifier):
 
 
 @pytest.fixture
-def random_empty_dataset(tmp_dataset_path, random_item_attrs, random_metadata_dict):
-    return Dataset(tmp_dataset_path, random_item_attrs,
-                   metadata=random_metadata_dict)
+def random_empty_dataset(
+        tmp_dataset_path, random_item_attrs, random_metadata_dict):
+
+    dataset_builder = Dataset.build(tmp_dataset_path) \
+        .with_metadata(**random_metadata_dict)
+    for item_attr in random_item_attrs:
+        dataset_builder.add_item_attr(**item_attr.dict())
+
+    return dataset_builder.conclude_build()
 
 
 @pytest.fixture
-def random_dataset_with_random_data(make_random_item_dict, random_empty_dataset):
+def random_dataset_with_random_data(
+        make_random_item_dict, random_empty_dataset):
+
     dataset = random_empty_dataset
     num_items = random.randint(1, 20)
     for _ in range(num_items):
