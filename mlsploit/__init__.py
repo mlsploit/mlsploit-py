@@ -6,9 +6,7 @@ from . import dataset
 
 
 # Public objects
-__all__ = ['Job',
-           'Module',
-           'dataset']
+__all__ = ["Job", "Module", "dataset"]
 
 # Semantic version
-__version__ = '0.0.0'
+__version__ = "0.0.0"

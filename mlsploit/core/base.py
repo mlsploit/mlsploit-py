@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
 
-__all__ = ['FauxImmutableModel']
+__all__ = ["FauxImmutableModel"]
 
 
 class FauxImmutableModel(BaseModel):

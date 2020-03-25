@@ -4,7 +4,7 @@
 [![Code Coverage](https://img.shields.io/codecov/c/gh/mlsploit/mlsploit-py)](https://codecov.io/gh/mlsploit/mlsploit-py)
 [![Updates](https://pyup.io/repos/github/mlsploit/mlsploit-py/shield.svg)](https://pyup.io/repos/github/mlsploit/mlsploit-py/)
 [![Python 3](https://pyup.io/repos/github/mlsploit/mlsploit-py/python-3-shield.svg)](https://pyup.io/repos/github/mlsploit/mlsploit-py/)
-
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 > This package contains utilities for developing an MLsploit python module.
 
@@ -54,18 +54,18 @@ Job.commit_output() # mlsploit-py will take care of the rest
 
 
 You can also use this package to programmatically create your MLsploit module configuration file (`mlsploit_module.yaml`)
-instead of editing it manually. This will also validate your MLsploit module for errors. 
-For more information on the configuration file schema, 
+instead of editing it manually. This will also validate your MLsploit module for errors.
+For more information on the configuration file schema,
 [see here](https://github.com/mlsploit/mlsploit-py/blob/master/mlsploit/_auxiliary/mlsploit_module.schema).
 
-```python 
+```python
 # make_dummy_module.py
 
 from mlsploit import Module
 
 module = Module.build(
     display_name='Dummy Module',
-    tagline='This is a dummy module!', 
+    tagline='This is a dummy module!',
     doctxt="""Long documentation for this module will go here...""",
     icon_url='https://somedomain.org/icon.jpg')
 
