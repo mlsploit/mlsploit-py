@@ -11,6 +11,7 @@ extension-pkg-whitelist=pydantic
 disable=missing-module-docstring,
         missing-class-docstring,
         missing-function-docstring,
+        bad-continuation, # favor black
         print-statement,
         parameter-unpacking,
         unpacking-in-except,
