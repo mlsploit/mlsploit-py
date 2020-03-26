@@ -76,12 +76,12 @@ def test_degenerate_module_cannot_be_saved(degenerate_module, tmp_module_dir):
     assert "functions: Length of [] is less than than 1" in str(excinfo.value)
 
 
-def test_module_add_function(degenerate_module):
+def test_module_build_function(degenerate_module):
     m = degenerate_module
 
     assert type(m.functions) is list and len(m.functions) == 0
 
-    f1 = m.add_function(
+    f1 = m.build_function(
         name=FUNCTION_NAME,
         doctxt=FUNCTION_DOCTXT,
         creates_new_files=True,
@@ -92,7 +92,7 @@ def test_module_add_function(degenerate_module):
     assert type(m.functions) is list and len(m.functions) == 1
     assert m.functions[0] is f1
 
-    f2 = m.add_function(
+    f2 = m.build_function(
         name="Another Function",
         doctxt=FUNCTION_DOCTXT,
         creates_new_files=False,
@@ -109,7 +109,7 @@ def test_module_add_duplicate_function(dummy_module):
     m = dummy_module
 
     with pytest.raises(RuntimeError) as excinfo:
-        m.add_function(
+        m.build_function(
             name=FUNCTION_NAME,
             doctxt=FUNCTION_DOCTXT,
             creates_new_files=True,

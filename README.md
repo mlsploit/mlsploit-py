@@ -69,7 +69,7 @@ module = Module.build(
     doctxt="""Long documentation for this module will go here...""",
     icon_url='https://somedomain.org/icon.jpg')
 
-function = module.add_function(
+function = module.build_function(
     name='Test Function',
     doctxt="""Some long ducumentation of Test Function...""",
     creates_new_files=True,

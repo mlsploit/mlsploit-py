@@ -160,7 +160,7 @@ class Module(FauxImmutableModel):
 
     # pylint: enable=no-self-argument,no-self-use
 
-    def add_function(
+    def build_function(
         self,
         name: str,
         doctxt: str,

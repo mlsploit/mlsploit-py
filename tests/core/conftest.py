@@ -42,7 +42,7 @@ def degenerate_module() -> Module:
 @pytest.fixture
 def dummy_module(degenerate_module) -> Module:
     m = degenerate_module
-    f = m.add_function(
+    f = m.build_function(
         name=FUNCTION_NAME,
         doctxt=FUNCTION_DOCTXT,
         creates_new_files=True,
