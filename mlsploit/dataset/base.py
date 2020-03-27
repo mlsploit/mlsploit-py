@@ -2,7 +2,7 @@ from collections import namedtuple
 from functools import partial
 from pathlib import Path
 from threading import Lock
-from typing import Generator, Optional, Tuple, Union
+from typing import Any, Callable, Generator, Optional, Tuple, Type, Union
 import warnings
 
 import numpy as np
@@ -15,11 +15,11 @@ from ..paths import FilepathType
 __all__ = ["Dataset"]
 
 
+DynamicNamedTuple = Tuple[Any, ...]
+
 _METADATA_KEY = "__METADATA__"
 _ITEMATTRS_KEY = "__ITEMATTRS__"
 _RECOMMENDED_FILENAME = "MLSPLOIT.db"
-
-PrimitiveType = Union[str, int, float, bool]
 
 # pylint: disable=invalid-name
 ItemViewMeta = partial(namedtuple, "ItemView")
@@ -27,6 +27,32 @@ ItemSetViewMeta = partial(namedtuple, "ItemSetView")
 MetadataViewMeta = partial(namedtuple, "MetadataView")
 ItemAttrSetViewMeta = partial(namedtuple, "ItemAttrSetView")
 # pylint: enable=invalid-name
+
+
+def enable_only_in_build_mode(instance_method):
+    def wrapper(self, *args, **kwargs):
+        # pylint: disable=protected-access
+        if not self._build_mode:
+            raise RuntimeError(
+                "%s is only enabled in Dataset build mode" % instance_method.__name__
+            )
+
+        return instance_method(self, *args, **kwargs)
+
+    return wrapper
+
+
+def disable_in_build_mode(instance_method):
+    def wrapper(self, *args, **kwargs):
+        # pylint: disable=protected-access
+        if self._build_mode:
+            raise RuntimeError(
+                "%s is disabled in Dataset build mode" % instance_method.__name__
+            )
+
+        return instance_method(self, *args, **kwargs)
+
+    return wrapper
 
 
 class ItemAttr(BaseModel):
@@ -72,23 +98,115 @@ class DatasetMeta(type):
         return _RECOMMENDED_FILENAME
 
 
-class Dataset(metaclass=DatasetMeta):
-    def __init__(self, filepath: FilepathType):
-        filepath = Path(filepath).resolve()
-        if not filepath.exists():
-            raise FileNotFoundError(
-                f'"{filepath}" '
-                f"(use Dataset.build instead, "
-                f"if you're trying to build a dataset)"
-            )
+class DatasetProto:
+    # pylint: disable=too-few-public-methods
+    _build_mode: bool
+    _lock: Lock
 
+    path: FilepathType
+    metadata: DynamicNamedTuple
+    item_attrs: DynamicNamedTuple
+
+    add_item: Callable[..., None]
+    read_metadata: Callable[[FilepathType], DynamicNamedTuple]
+    read_item_attrs: Callable[[FilepathType], DynamicNamedTuple]
+
+
+class DatasetBuilderMixin(DatasetProto):
+    @enable_only_in_build_mode
+    def _init_build_mode(self):
+        self._build_metadata = dict()
+        self._build_item_attrs = list()
+
+    @enable_only_in_build_mode
+    def _setup_dataset(self):
+        item_attrs_serialized = list(
+            map(lambda it: it.serialize(), self._build_item_attrs)
+        )
+
+        with self._lock, zarr.ZipStore(self.path, mode="w") as store:
+            root = zarr.group(store=store)
+
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)
+
+                root.attrs[_METADATA_KEY] = dict(self._build_metadata)
+                root.attrs[_ITEMATTRS_KEY] = item_attrs_serialized
+
+            for item_attr_serialized in item_attrs_serialized:
+                attr_name = item_attr_serialized["name"]
+                attr_dtype = item_attr_serialized["dtype_name"]
+                attr_shape = (
+                    tuple(item_attr_serialized["shape"])
+                    if item_attr_serialized["shape"] is not None
+                    else None
+                )
+
+                collection_shape = (0,) + attr_shape if attr_shape is not None else (0,)
+                chunk_shape = (1,) + attr_shape if attr_shape is not None else (1,)
+
+                root.create_dataset(
+                    attr_name,
+                    shape=collection_shape,
+                    chunks=chunk_shape,
+                    dtype=attr_dtype,
+                )
+
+    @enable_only_in_build_mode
+    def with_metadata(self, **metadata_kwargs) -> Type[DatasetProto]:
+        self._build_metadata.update(metadata_kwargs)
+        return self
+
+    @enable_only_in_build_mode
+    def add_item_attr(
+        self,
+        name: str,
+        shape: Union[Tuple[int, ...], None],
+        dtype: Union[str, np.dtype],
+    ) -> Type[DatasetProto]:
+
+        self._build_item_attrs.append(ItemAttr(name=name, shape=shape, dtype=dtype))
+        return self
+
+    @enable_only_in_build_mode
+    def conclude_build(self) -> Type[DatasetProto]:
+        self._setup_dataset()
+
+        self._build_mode = False
+        del self._build_metadata
+        del self._build_item_attrs
+
+        self.metadata = self.read_metadata(self.path)
+        self.item_attrs = self.read_item_attrs(self.path)
+
+        return self
+
+
+class Dataset(DatasetBuilderMixin, metaclass=DatasetMeta):
+    def __init__(self, filepath: FilepathType, build_mode: bool = False):
+        filepath = Path(filepath).resolve()
+
+        if build_mode and filepath.exists():
+            raise FileExistsError(filepath)
+        if (not build_mode) and (not filepath.exists()):
+            raise FileNotFoundError(filepath)
+
+        self._build_mode = build_mode
         self._lock = Lock()
 
         self.path = filepath
-        self.item_attrs = self.read_item_attrs(filepath)
-        self.metadata = self.read_metadata(filepath)
+        if build_mode:
+            self._init_build_mode()
+        else:
+            # fmt: off
+            self.metadata = self.read_metadata(filepath)     # pylint: disable=no-member
+            self.item_attrs = self.read_item_attrs(filepath) # pylint: disable=no-member
+            # fmt: on
 
     def __repr__(self) -> str:
+        if self._build_mode:
+            return "<%s: '%s', BUILD_MODE>" % (self.__class__.__name__, self.path)
+
         return "<%s: '%s', %s, %s, len=%d>" % (
             self.__class__.__name__,
             self.path,
@@ -97,6 +215,7 @@ class Dataset(metaclass=DatasetMeta):
             len(self),
         )
 
+    @disable_in_build_mode
     def __len__(self) -> int:
         sizes = set()
         with self._lock, zarr.ZipStore(self.path, mode="r") as store:
@@ -107,7 +226,8 @@ class Dataset(metaclass=DatasetMeta):
             raise RuntimeError("Dataset corrupted!!!")
         return sizes.pop()
 
-    def __getitem__(self, idx) -> Union["ItemView", "ItemSetView"]:
+    @disable_in_build_mode
+    def __getitem__(self, idx) -> DynamicNamedTuple:
         attr_names = list(map(lambda a: a.name, self.item_attrs))
         with self._lock, zarr.ZipStore(self.path, mode="r") as store:
             root = zarr.group(store=store)
@@ -119,10 +239,12 @@ class Dataset(metaclass=DatasetMeta):
             else ItemSetViewMeta(attr_names)(**data_dict)
         )
 
-    def __iter__(self) -> Generator["ItemView", None, None]:
+    @disable_in_build_mode
+    def __iter__(self) -> Generator[DynamicNamedTuple, None, None]:
         for i in range(len(self)):
             yield self[i]
 
+    @disable_in_build_mode
     def add_item(self, **attr_kwargs):
         initial_size = len(self)
 
@@ -168,15 +290,15 @@ class Dataset(metaclass=DatasetMeta):
             )
 
     @staticmethod
-    def read_metadata(filepath: FilepathType) -> "MetadataView":
+    def read_metadata(filepath: FilepathType) -> DynamicNamedTuple:
         filepath = Path(filepath).resolve()
         with zarr.ZipStore(filepath, mode="r") as store:
             root = zarr.group(store=store)
             metadata = root.attrs[_METADATA_KEY]
         return MetadataViewMeta(sorted(metadata.keys()))(**metadata)
 
-    @classmethod
-    def read_item_attrs(cls, filepath: FilepathType) -> "ItemAttrSetView":
+    @staticmethod
+    def read_item_attrs(filepath: FilepathType) -> DynamicNamedTuple:
         filepath = Path(filepath).resolve()
         with zarr.ZipStore(filepath, mode="r") as store:
             root = zarr.group(store=store)
@@ -186,66 +308,5 @@ class Dataset(metaclass=DatasetMeta):
         return ItemAttrSetViewMeta(map(lambda a: a.name, item_attrs))(*item_attrs)
 
     @classmethod
-    def build(cls, filepath: FilepathType) -> "DatasetBuilder":
-        filepath = Path(filepath).resolve()
-        if filepath.exists():
-            raise FileExistsError(filepath)
-
-        return DatasetBuilder(filepath)
-
-
-class DatasetBuilder:
-    def __init__(self, filepath: FilepathType):
-        self._lock = Lock()
-        self._path = filepath
-        self._metadata = dict()
-        self._item_attrs = list()
-
-    def _setup_dataset(self):
-        item_attrs_serialized = list(map(lambda it: it.serialize(), self._item_attrs))
-
-        with self._lock, zarr.ZipStore(self._path, mode="w") as store:
-            root = zarr.group(store=store)
-
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", UserWarning)
-
-                root.attrs[_METADATA_KEY] = dict(self._metadata)
-                root.attrs[_ITEMATTRS_KEY] = item_attrs_serialized
-
-            for item_attr_serialized in item_attrs_serialized:
-                attr_name = item_attr_serialized["name"]
-                attr_dtype = item_attr_serialized["dtype_name"]
-                attr_shape = (
-                    tuple(item_attr_serialized["shape"])
-                    if item_attr_serialized["shape"] is not None
-                    else None
-                )
-
-                collection_shape = (0,) + attr_shape if attr_shape is not None else (0,)
-                chunk_shape = (1,) + attr_shape if attr_shape is not None else (1,)
-
-                root.create_dataset(
-                    attr_name,
-                    shape=collection_shape,
-                    chunks=chunk_shape,
-                    dtype=attr_dtype,
-                )
-
-    def with_metadata(self, **metadata_kwargs) -> "DatasetBuilder":
-        self._metadata.update(metadata_kwargs)
-        return self
-
-    def add_item_attr(
-        self,
-        name: str,
-        shape: Union[Tuple[int, ...], None],
-        dtype: Union[str, np.dtype],
-    ) -> "DatasetBuilder":
-
-        self._item_attrs.append(ItemAttr(name=name, shape=shape, dtype=dtype))
-        return self
-
-    def conclude_build(self) -> Dataset:
-        self._setup_dataset()
-        return Dataset(self._path)
+    def build(cls, filepath: FilepathType) -> "Dataset":
+        return cls(filepath, build_mode=True)

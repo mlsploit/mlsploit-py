@@ -53,19 +53,17 @@ def test_dataset_item_attr_serialize_deserialize(random_item_attrs):
 def test_dataset_build_with_item_attrs(tmp_dataset_path, random_item_attrs):
     assert not tmp_dataset_path.exists()
 
-    dataset_builder = Dataset.build(tmp_dataset_path)
+    dataset = Dataset.build(tmp_dataset_path)
     for item_attr in random_item_attrs:
         attr_name, attr_shape, attr_dtype = (
             item_attr.name,
             item_attr.shape,
             item_attr.dtype,
         )
+        dataset.add_item_attr(name=attr_name, shape=attr_shape, dtype=attr_dtype)
 
-        dataset_builder.add_item_attr(
-            name=attr_name, shape=attr_shape, dtype=attr_dtype
-        )
-    dataset = dataset_builder.conclude_build()
-
+    assert not tmp_dataset_path.exists()
+    dataset.conclude_build()
     assert tmp_dataset_path.exists()
     assert dataset.path == tmp_dataset_path.resolve()
 
@@ -81,10 +79,10 @@ def test_dataset_item_attr_name_not_identifier(
 ):
 
     for _ in range(100):
-        dataset_builder = Dataset.build(tmp_dataset_path)
+        dataset = Dataset.build(tmp_dataset_path)
         invalid_name = make_random_invalid_identifier()
         with pytest.raises(ValueError) as excinfo:
-            dataset_builder.add_item_attr(name=invalid_name, shape=None, dtype=int)
+            dataset.add_item_attr(name=invalid_name, shape=None, dtype=int)
         assert "has to be a valid python identifier" in str(excinfo)
 
 
@@ -92,13 +90,13 @@ def test_dataset_init_with_metadata(
     tmp_dataset_path, random_metadata_dict, random_item_attrs
 ):
 
-    dataset_builder = Dataset.build(tmp_dataset_path)
+    dataset = Dataset.build(tmp_dataset_path)
     for item_attr in random_item_attrs:
-        dataset_builder.add_item_attr(**item_attr.dict())
+        dataset.add_item_attr(**item_attr.dict())
     for k, v in random_metadata_dict.items():
-        dataset_builder.with_metadata(**{k: v})
+        dataset.with_metadata(**{k: v})
 
-    dataset = dataset_builder.conclude_build()
+    dataset.conclude_build()
 
     for k, v in random_metadata_dict.items():
         assert getattr(dataset.metadata, k) == v
@@ -177,3 +175,59 @@ def test_dataset_load(random_dataset_with_random_data):
         num_items_checked += 1
 
     assert len(loaded_dataset) == len(base_dataset) == num_items_checked
+
+
+def test_dataset_build_mode(
+    tmp_dataset_path, make_random_item_attr, make_random_item_dict
+):
+    dataset = Dataset.build(tmp_dataset_path)
+
+    with pytest.raises(AttributeError):
+        _ = dataset.metadata
+
+    with pytest.raises(AttributeError):
+        _ = dataset.item_attrs
+
+    with pytest.raises(RuntimeError) as excinfo:
+        len(dataset)
+    assert "disabled in Dataset build mode" in str(excinfo)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        _ = dataset[0]
+    assert "disabled in Dataset build mode" in str(excinfo)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        for _ in dataset:
+            pass
+    assert "disabled in Dataset build mode" in str(excinfo)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        dataset.add_item()
+    assert "disabled in Dataset build mode" in str(excinfo)
+
+    item_attr = make_random_item_attr()
+    dataset.add_item_attr(**item_attr.dict())
+    dataset = dataset.conclude_build()
+
+    dataset.add_item(**make_random_item_dict([item_attr]))
+
+    num_iterated = 0
+    for _ in dataset:
+        num_iterated += 1
+    assert num_iterated == 1
+    assert len(dataset) == 1
+    assert len(dataset.item_attrs) == 1
+    assert dataset.item_attrs[0] == item_attr
+    assert dataset.metadata._asdict() == {}
+
+    with pytest.raises(RuntimeError) as excinfo:
+        dataset.with_metadata()
+    assert "is only enabled in Dataset build mode" in str(excinfo)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        dataset.add_item_attr(**make_random_item_attr().dict())
+    assert "is only enabled in Dataset build mode" in str(excinfo)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        dataset.conclude_build()
+    assert "is only enabled in Dataset build mode" in str(excinfo)

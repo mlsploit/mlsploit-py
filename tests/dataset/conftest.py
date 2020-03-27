@@ -146,13 +146,11 @@ def random_metadata_dict(make_random_valid_identifier):
 @pytest.fixture
 def random_empty_dataset(tmp_dataset_path, random_item_attrs, random_metadata_dict):
 
-    dataset_builder = Dataset.build(tmp_dataset_path).with_metadata(
-        **random_metadata_dict
-    )
+    dataset = Dataset.build(tmp_dataset_path).with_metadata(**random_metadata_dict)
     for item_attr in random_item_attrs:
-        dataset_builder.add_item_attr(**item_attr.dict())
+        dataset.add_item_attr(**item_attr.dict())
 
-    return dataset_builder.conclude_build()
+    return dataset.conclude_build()
 
 
 @pytest.fixture
