@@ -10,7 +10,7 @@ from numpy import random as np_random
 import pytest
 
 from mlsploit.dataset import Dataset
-from mlsploit.dataset.base import ItemAttr
+from mlsploit.dataset.base import Feature
 
 from .constants import *
 
@@ -58,8 +58,8 @@ def make_random_invalid_identifier(make_random_valid_identifier):
 
 
 @pytest.fixture
-def make_random_item_attr(make_random_valid_identifier):
-    def __make_random_item_attr():
+def make_random_feature(make_random_valid_identifier):
+    def __make_random_feature():
         name = make_random_valid_identifier()
         shape = (
             None
@@ -68,9 +68,9 @@ def make_random_item_attr(make_random_valid_identifier):
         )
         dtype = random.choice([str, int, float, bool, np.uint8, np.float32])
 
-        return ItemAttr(name=name, shape=shape, dtype=dtype)
+        return Feature(name=name, shape=shape, dtype=dtype)
 
-    return __make_random_item_attr
+    return __make_random_feature
 
 
 @pytest.fixture
@@ -88,14 +88,14 @@ def make_random_data():
 
 @pytest.fixture
 def make_random_item_dict(make_random_data):
-    def __make_random_item(item_attrs):
+    def __make_random_item(features):
         item_dict = dict()
-        for item_attr in item_attrs:
-            attr_name = item_attr.name
-            attr_shape = item_attr.shape
-            attr_dtype = item_attr.dtype
+        for feature in features:
+            feat_name = feature.name
+            feat_shape = feature.shape
+            feat_dtype = feature.dtype
 
-            item_dict[attr_name] = make_random_data(attr_shape, attr_dtype)
+            item_dict[feat_name] = make_random_data(feat_shape, feat_dtype)
         return item_dict
 
     return __make_random_item
@@ -103,19 +103,19 @@ def make_random_item_dict(make_random_data):
 
 @pytest.fixture
 def make_random_item_dicts(make_random_item_dict):
-    def __make_random_item_dicts(item_attrs):
+    def __make_random_item_dicts(features):
         num_items = random.randint(1, 20)
-        return [make_random_item_dict(item_attrs) for _ in range(num_items)]
+        return [make_random_item_dict(features) for _ in range(num_items)]
 
     return __make_random_item_dicts
 
 
 @pytest.fixture
-def random_item_attrs(make_random_item_attr):
-    num_item_attrs = random.randint(1, 5)
-    item_attrs = [make_random_item_attr() for _ in range(num_item_attrs)]
-    item_attrs = {it.name: it for it in item_attrs}  # drop duplicates
-    return list(item_attrs.values())
+def random_features(make_random_feature):
+    num_features = random.randint(1, 5)
+    features = [make_random_feature() for _ in range(num_features)]
+    features = {f.name: f for f in features}  # drop duplicates
+    return list(features.values())
 
 
 @pytest.fixture
@@ -144,11 +144,11 @@ def random_metadata_dict(make_random_valid_identifier):
 
 
 @pytest.fixture
-def random_empty_dataset(tmp_dataset_path, random_item_attrs, random_metadata_dict):
+def random_empty_dataset(tmp_dataset_path, random_features, random_metadata_dict):
 
     dataset = Dataset.build(tmp_dataset_path).with_metadata(**random_metadata_dict)
-    for item_attr in random_item_attrs:
-        dataset.add_item_attr(**item_attr.dict())
+    for feature in random_features:
+        dataset.add_feature(**feature.dict())
 
     return dataset.conclude_build()
 
@@ -159,6 +159,6 @@ def random_dataset_with_random_data(make_random_item_dict, random_empty_dataset)
     dataset = random_empty_dataset
     num_items = random.randint(1, 20)
     for _ in range(num_items):
-        dataset.add_item(**make_random_item_dict(dataset.item_attrs))
+        dataset.add_item(**make_random_item_dict(dataset.features))
 
     return dataset
