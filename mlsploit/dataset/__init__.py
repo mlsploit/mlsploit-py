@@ -1,4 +1,4 @@
-from .base import Dataset
+from . import datasets, features
+from .base import *
 
-
-__all__ = ["Dataset"]
+__all__ = ["datasets", "features", "Dataset", "Feature", "Metadata"]
