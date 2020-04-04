@@ -132,6 +132,19 @@ def test_module_get_function(dummy_module):
     assert "cannot find function" in str(excinfo)
 
 
+def test_module_parse_obj_and_validate(dummy_module):
+    data = dummy_module.dict()
+    del data["doctxt"]
+    with pytest.raises(ValidationError) as excinfo:
+        Module.parse_obj_and_validate(data)
+    assert "missing" in str(excinfo)
+
+
+def test_module_serialize_and_deserialize(dummy_module):
+    deserialized_module = Module.deserialize(dummy_module.serialize())
+    assert deserialized_module == dummy_module
+
+
 def test_module_save(dummy_module, tmp_module_dir):
     m = dummy_module
 

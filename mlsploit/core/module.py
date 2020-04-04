@@ -1,3 +1,4 @@
+import json
 from typing import Any, List, Optional
 
 from pydantic import HttpUrl, validator
@@ -211,15 +212,29 @@ class Module(FauxImmutableModel):
         with open(path, "w") as f:
             f.write(yaml.dump(data, sort_keys=False, default_flow_style=False))
 
+    def serialize(self) -> str:
+        data = self.dict()
+        data["icon_url"] = str(data["icon_url"])
+        return json.dumps(data)
+
+    @classmethod
+    def deserialize(cls, data: str) -> "Module":
+        data = json.loads(data)
+        return cls.parse_obj_and_validate(data)
+
+    @classmethod
+    def parse_obj_and_validate(cls, obj: Any) -> "Module":
+        module = cls.parse_obj(obj)
+        module.validate_with_schema()
+        return module
+
     @classmethod
     def load(cls, path: Optional[FilepathType] = None) -> "Module":
         path = path or ModulePaths().module_file
         with open(path, "r") as f:
             data = yaml.safe_load(f.read())
 
-        module = cls.parse_obj(data)
-        module.validate_with_schema()
-        return module
+        return cls.parse_obj_and_validate(data)
 
     @classmethod
     def build(
