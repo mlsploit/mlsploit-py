@@ -45,7 +45,7 @@ setup(
     packages=find_packages(include=("mlsploit", "mlsploit.*")),
     include_package_data=True,
     classifiers=[
-        "Development Status :: 2 - Pre-Alpha",
+        "Development Status :: 3 - Alpha",
         "Intended Audience :: Education",
         "Intended Audience :: Developers",
         "Intended Audience :: Science/Research",

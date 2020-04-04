@@ -11,9 +11,8 @@
 ## Setup
 To install this package on your system using [pip](https://pip.pypa.io/en/stable/), run the following command:
 ```bash
-$ pip install git+https://github.com/mlsploit/mlsploit-py
+$ pip install mlsploit-py
 ```
-This will fetch the package from this repository and install it locally. We're also working on releasing a [PyPI](https://pypi.org/) distribution soon.
 
 ## Usage
 This package supports automatic loading of MLsploit jobs inside your module.
