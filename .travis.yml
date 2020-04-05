@@ -18,3 +18,12 @@ script:
 
 after_success:
   - codecov # submit coverage
+
+deploy:
+  provider: pypi
+  user: "__token__"
+  password:
+    secure: "JxzBh7VyXFsMUtlH1oR7ZXyhynUxh9inw395cihDfCvfB+5yq4ortL4OHgUH8lXMN2Pe1tSGnH1s/gdIFilAGcxt8HrKBX/W3JoWUn4NaXUR086rMKeWwpiGSdNSrtJvTkSOntVo2dg3ukXwM1ehDdewJbdXeesHjv7g9kmrYwwoI8RYEZBkwHwA/QkOq7usYZsSKtM+7yVNayJJCrKfJrYYoxXwENVuPuI2DlNzBfaHqeCf6t0pGAL7XHwoeK0w7Y3yQdxUW0gk+RFnIEhl/4cQWBFbk7kmP/7jT0MYKjBirTcSaVQQ9GC+YkNBV9vEoRyvhxnBBOiKGwDimpyA5Hdl8D4cbwnQbEpxf3LBGsvjyeUy1XL0YFgNH4KjsMf/VYxau/NmnrvQocA9KE6sL0v7VQM2qAnJf3RXkmLFR82Be67yPu86FYP+pe+VhDpYBfTpZAbqxbVSdmSdqklN66rhQpHYyLu4qO1bjMCyYwpP0AP5HCPqqaot4Pc3FJkiBaNezIRKD1wrHxNMKPvRoX44I98kmW4GGAfHgG1jhMfMWQrT8iBNTShACrsUibW4wJgsxzislAo4phvF++HSSA5PxYz9m30Uyrj4/Fbo4o1QxABlz7rcxTvfjESgtnjKwpPoalNQAxgTm+sOHNiRPm533PSj7wxBdRYYR4JUi54="
+  on:
+    tags: true
+  skip_existing: true
