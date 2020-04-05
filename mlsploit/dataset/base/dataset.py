@@ -148,11 +148,12 @@ class Dataset(metaclass=_DatasetMeta):
         _ = len(self)  # health check
 
     def __repr__(self):
-        return "%s(path=%s, metadata=%s, features=%s)" % (
+        return "%s(path=%s, metadata=%s, features=%s, len=%d)" % (
             self.__class__.__name__,
             self.path,
             self.metadata,
             self.features,
+            len(self),
         )
 
     def __len__(self):
