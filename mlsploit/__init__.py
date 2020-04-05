@@ -9,4 +9,4 @@ from .core.module import Module
 __all__ = ["dataset", "Job", "Module"]
 
 # Semantic version
-__version__ = "0.1.0"
+__version__ = "0.1.1"
