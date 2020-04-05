@@ -35,6 +35,52 @@ def test_dataset_subclass():
     assert TestDataset.metadata["attr2"] == "val2"
 
 
+def test_dataset_inheritance_order():
+    class DatasetX(Dataset):
+        feature = Feature(shape=None, dtype=int, metadata=Metadata(source="X"))
+
+        class DefaultMetadata:
+            source = "X"
+
+    class DatasetY(Dataset):
+        feature = Feature(shape=None, dtype=int, metadata=Metadata(source="Y"))
+
+        class DefaultMetadata:
+            source = "Y"
+
+    class DatasetZ(Dataset):
+        feature = Feature(shape=None, dtype=int, metadata=Metadata(source="Z"))
+
+        class DefaultMetadata:
+            source = "Z"
+
+    class DatasetA(DatasetX, DatasetY):
+        pass
+
+    class DatasetB(DatasetY, DatasetZ):
+        feature = Feature(shape=None, dtype=int, metadata=Metadata(source="B"))
+
+        class DefaultMetadata:
+            source = "B"
+
+    class DatasetT(DatasetA, DatasetB):
+        pass
+
+    assert DatasetX.metadata["source"] == "X"
+    assert DatasetY.metadata["source"] == "Y"
+    assert DatasetZ.metadata["source"] == "Z"
+    assert DatasetA.metadata["source"] == "X"
+    assert DatasetB.metadata["source"] == "B"
+    assert DatasetT.metadata["source"] == "X"
+
+    assert DatasetX.features["feature"].metadata["source"] == "X"
+    assert DatasetY.features["feature"].metadata["source"] == "Y"
+    assert DatasetZ.features["feature"].metadata["source"] == "Z"
+    assert DatasetA.features["feature"].metadata["source"] == "X"
+    assert DatasetB.features["feature"].metadata["source"] == "B"
+    assert DatasetT.features["feature"].metadata["source"] == "X"
+
+
 def test_dataset_initialize(tmp_dataset_path, random_dataset_class):
     assert not tmp_dataset_path.exists()
     dataset = random_dataset_class.initialize(tmp_dataset_path, testmetadata="testval")

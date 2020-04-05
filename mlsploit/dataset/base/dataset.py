@@ -98,7 +98,7 @@ class _DatasetMeta(type):
         metadata = OrderedDict()
         features = OrderedDict()
 
-        for base in bases:
+        for base in reversed(bases):
             if hasattr(base, "metadata") and isinstance(base.metadata, Metadata):
                 metadata.update(base.metadata.dict())
 
