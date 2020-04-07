@@ -97,11 +97,18 @@ class InputDocument(FauxImmutableModel):
                 and value is not None
                 and type(value).__name__ != option.type
             ):
-                raise ValueError(
-                    f'Incorrect type of value "{value}" '
-                    f'for option "{option_name}". '
-                    f"Allowed type: {option.type}"
+                type_ = {"str": str, "int": int, "float": float, "bool": bool}.get(
+                    option.type, lambda x: x
                 )
+
+                try:
+                    self.options[option_name] = type_(value)
+                except Exception as e:
+                    raise ValueError(
+                        f'Incorrect type of value "{value}" '
+                        f'for option "{option_name}". '
+                        f"Allowed type: {option.type}"
+                    )
 
         # check files
         for input_file_item in self.input_file_items:
