@@ -18,10 +18,6 @@ class InputFileItem(FauxImmutableModel):
     tags: Mapping[str, Any]
 
     @property
-    def filetype(self) -> str:
-        return Path(self.name).suffix[1:]
-
-    @property
     def path(self) -> FilepathType:
         return JobPaths().input_dir / self.name
 
@@ -36,7 +32,14 @@ class InputFileItem(FauxImmutableModel):
         allowed_filetypes = {function.expected_filetype}.union(
             function.optional_filetypes or []
         )
-        if self.filetype not in allowed_filetypes:
+
+        allowed = False
+        for filetype in allowed_filetypes:
+            if self.name.endswith(filetype):
+                allowed = True
+                break
+
+        if not allowed:
             raise TypeError(
                 f"allowed filetypes: {str(allowed_filetypes)} " f"(given: {self.name})"
             )
