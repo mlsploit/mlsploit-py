@@ -1,4 +1,4 @@
-black==19.10b0
+black==22.1.0
 codecov==2.0.22
 devtools==0.5.1
 pylint==2.4.4
